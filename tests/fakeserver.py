@@ -29,7 +29,9 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
+
+from localready.proxy import FastHTTPServer as ThreadingHTTPServer
 from typing import Any
 
 CHARS_PER_TOKEN = 4
@@ -438,11 +440,21 @@ def _example_input(tool: dict[str, Any] | None) -> dict[str, Any]:
     return out
 
 
-if __name__ == "__main__":  # live use: python tests/fakeserver.py PORT
+def _main(argv: list[str]) -> None:
+    """``python tests/fakeserver.py PORT [field=value ...]`` serves a fake engine on 127.0.0.1:PORT."""
+    kwargs: dict[str, Any] = {}
+    for arg in argv[1:]:
+        key, _, raw = arg.partition("=")
+        default = getattr(Behaviour(), key)
+        kwargs[key] = (raw.lower() in ("1", "true", "yes")) if isinstance(default, bool) else type(default)(raw)
+    srv = FakeServer(Behaviour(**kwargs))
+    srv.httpd.server_close()
+    srv.httpd = ThreadingHTTPServer(("127.0.0.1", int(argv[0])), type("H", (_Handler,), {"fake": srv}))
+    print(f"fake server on 127.0.0.1:{argv[0]} {kwargs}", flush=True)
+    srv.httpd.serve_forever()
+
+
+if __name__ == "__main__":
     import sys
 
-    srv = FakeServer(Behaviour(n_ctx=200000))
-    srv.httpd.server_close()
-    srv.httpd = ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), type("H", (_Handler,), {"fake": srv}))
-    print(f"fake server on 127.0.0.1:{sys.argv[1]}", flush=True)
-    srv.httpd.serve_forever()
+    _main(sys.argv[1:] or ["18081", "n_ctx=200000"])

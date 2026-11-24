@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import socketserver
 import sys
 import threading
 import time
@@ -245,6 +246,17 @@ def _error_message(text: str) -> str:
     return text.strip()[:300]
 
 
+class FastHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer without the reverse-DNS ``getfqdn`` call that stalls on some macOS hosts."""
+
+    daemon_threads = True
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name, self.server_port = str(host), int(port)
+
+
 def serve(listen: str, upstream: str, recorder: Recorder, timeout: float = 900.0,
           ready: threading.Event | None = None) -> ThreadingHTTPServer:
     """Build the proxy server (call ``serve_forever`` on it). ``listen`` is ``host:port``."""
@@ -254,8 +266,7 @@ def serve(listen: str, upstream: str, recorder: Recorder, timeout: float = 900.0
         "recorder": recorder,
         "upstream_timeout": timeout,
     })
-    server = ThreadingHTTPServer((host or "127.0.0.1", int(port)), handler)
-    server.daemon_threads = True
+    server = FastHTTPServer((host or "127.0.0.1", int(port)), handler)
     if ready is not None:
         ready.set()
     return server

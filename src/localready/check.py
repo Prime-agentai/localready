@@ -159,7 +159,12 @@ def env_lines(rep: Report, h: Harness) -> list[str]:
     """The exact client-side setup for this harness against this server."""
     w = rep.window
     if h.key == CLAUDE_CODE.key:
-        lines = [
+        lines = []
+        if w and h.first_request_tokens and w < h.first_request_tokens:
+            lines.append(f"# NOT READY: the server's {w:,}-token window cannot hold Claude Code's first request "
+                         f"({h.first_request_tokens:,}). Raise it first (see `localready check`), then re-run "
+                         "`localready env`.")
+        lines += [
             f"export ANTHROPIC_BASE_URL={rep.base_url}",
             "export ANTHROPIC_AUTH_TOKEN=local",
             f"export ANTHROPIC_MODEL={rep.model}",

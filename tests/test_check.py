@@ -55,7 +55,9 @@ def test_silent_truncation_is_caught_and_measured() -> None:
     assert rep.window == fit.data["processed_tokens"] and 4000 <= rep.window <= 4096
     assert f["context.window"].status == Status.FAIL
     assert rep.exit_code == 2
-    assert f"CLAUDE_CODE_MAX_CONTEXT_TOKENS={rep.window}" in "\n".join(env_lines(rep, CLAUDE_CODE))
+    env = env_lines(rep, CLAUDE_CODE)
+    assert env[0].startswith("# NOT READY")
+    assert f"CLAUDE_CODE_MAX_CONTEXT_TOKENS={rep.window}" in "\n".join(env)
 
 
 def test_silent_truncation_with_declared_window_fails_overflow_probe() -> None:
